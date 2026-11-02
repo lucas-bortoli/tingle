@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import ApplicationError from "./lib/application-error.ts";
 
 export class MissingConfigurationError extends ApplicationError {
@@ -10,6 +12,7 @@ export interface Config {
   discordToken: string;
   prefix: string;
   adminIds: string[];
+  openaiCredentialsFile: string;
   openaiModel: string;
 }
 
@@ -34,10 +37,14 @@ export function loadConfig(env: NodeJS.ProcessEnv) {
   const prefix = env.PREFIX ?? ".";
   const adminIds = split(env.BOT_ADMINS);
 
+  const openaiCredentialsFile =
+    env.AWSTA_OPENAI_CREDS_FILE ?? join(tmpdir(), "awsta", "chatgpt.json");
+
   return {
     discordToken,
     prefix,
     adminIds,
+    openaiCredentialsFile,
     openaiModel,
   } satisfies Config;
 }
