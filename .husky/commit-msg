@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+
+if [ "$#" -ne 1 ] || [ ! -r "$1" ]; then
+  echo "commit-msg: expected a readable commit message file" >&2
+  exit 1
+fi
+
+subject=$(sed -n '1p' "$1")
+
+# Allow Git's generated merge and revert titles.
+case "$subject" in
+  Merge\ *|Revert\ \"*\") exit 0 ;;
+esac
+
+if printf '%s\n' "$subject" | LC_ALL=C grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\([^()[:space:]]+\)!?: [^[:space:]].*$'; then
+  if grep -q 'Co-Authored-By.*Claude' "$1"; then
+    cat >&2 <<'EOF'
+Commit rejected: Co-Authored-By Claude is not allowed.
+EOF
+    exit 1
+  fi
+  exit 0
+fi
+
+cat >&2 <<'EOF'
+Invalid commit title. Use: type(scope)!: description
+
+Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+Scope is required. ! (breaking change) is optional.
+
+Examples:
+  feat(kernel): add health endpoint
+  fix(kernel): handle missing routes
+  feat(api)!: change response format
+EOF
+exit 1
