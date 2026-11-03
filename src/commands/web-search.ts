@@ -10,7 +10,7 @@ const formatLink = (results: string[], index: number) =>
 export default command({
   name: "search",
   aliases: ["google", "g"],
-  description: "Pesquisa na internet.",
+  description: "Pesquisa na internet",
   argsSchema: z.object({
     query: z.string(),
   }),
@@ -19,7 +19,7 @@ export default command({
       query: positionalArgs.join(" "),
     };
   },
-  execute: async (args, message) => {
+  execute: async (_awsta, args, message) => {
     // Fetch a generous result set so reaction-based pagination has room to move.
     const results = await search({ query: args.query, language: "pt-BR", max: 99 });
 

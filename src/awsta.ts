@@ -52,7 +52,7 @@ export default class Awsta {
   ) {
     logger.debug("Executing command", { name: command.name, args: args });
     try {
-      const result = await command.execute(args, message, personality);
+      const result = await command.execute(this, args, message, personality);
       return result;
     } catch (cause) {
       throw new CommandExecutionError(
