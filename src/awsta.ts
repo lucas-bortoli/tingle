@@ -209,7 +209,7 @@ export default class Awsta {
       status: "online",
       activities: [
         {
-          name: ".ajuda ou @mencione",
+          name: `${this.config.prefix}ajuda ou @mencione`,
           type: ActivityType.Custom,
         },
       ],
