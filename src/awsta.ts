@@ -16,6 +16,33 @@ export default class Awsta {
   public client!: Client;
   public openai!: OpenAI;
 
+  /**
+   * Recent invocation timestamps, keyed by Discord user ID.
+   */
+  private readonly userInvocations = new Map<string, number[]>();
+
+  /**
+   * Checks the user's invocation limit and replies with the personality's wait message.
+   */
+  private async handleRateLimits(message: Message, personality: Personality) {
+    const { count, windowMs, message: waitMessage } = personality.invocationLimit;
+    const now = Date.now();
+    const recentInvocations = (this.userInvocations.get(message.author.id) ?? []).filter(
+      (timestamp) => now - timestamp < windowMs,
+    );
+
+    if (recentInvocations.length < count) {
+      recentInvocations.push(now);
+      this.userInvocations.set(message.author.id, recentInvocations);
+      return false;
+    }
+
+    this.userInvocations.set(message.author.id, recentInvocations);
+
+    await message.reply(waitMessage);
+    return true;
+  }
+
   private addReaction(message: Message, emoji: string): () => Promise<void> {
     const reaction = message.react(emoji).catch(() =>
       logger.warn("failed to add temporary reaction", {
@@ -207,9 +234,11 @@ export default class Awsta {
 
     try {
       if (message.content.startsWith(this.config.prefix)) {
+        if (await this.handleRateLimits(message, personality)) return;
         removeGearReaction = this.addReaction(message, "⚙️");
         await this.handleLegacyMessageCommandDispatch(message, personality);
       } else if (this.client.user && message.mentions.has(this.client.user?.id)) {
+        if (await this.handleRateLimits(message, personality)) return;
         removeGearReaction = this.addReaction(message, "⚙️");
         await this.handleNaturalLanguageCommandDispatch(message, personality);
       } else {
