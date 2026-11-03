@@ -22,6 +22,9 @@ export default command({
     }
 
     embed.setImage(awsta.client.user?.avatarURL({ size: 64 }) ?? null);
+    embed.setFooter({
+      text: 'Converse comigo! "@Tingle, por que a lua parece maior?", ou "@Tingle, pesquise resultados das eleições em 2026 no Brasil"',
+    });
 
     message.reply({ embeds: [embed] });
   },
