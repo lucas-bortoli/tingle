@@ -1,30 +1,30 @@
 import type { Snowflake } from "discord.js";
 import type z from "zod";
-import type { Tool } from "./tools/_tool.ts";
-import webSearch from "./tools/web-search.ts";
+import type { Command } from "./commands/_command.ts";
+import webSearch from "./commands/web-search.ts";
 
 export interface Personality {
   name: string;
   userWhitelist: Snowflake[] | null;
   guildWhitelist: Snowflake[] | null;
-  tools: Tool<z.ZodType>[];
+  commands: Command<z.ZodType>[];
 }
 
 const GUILD_ENDER_CHEST: Snowflake = "723189769412018228";
 const USER_PANTHEON: Snowflake = "717061233500618772";
 
-const NavaliaDevPersonality: Personality = {
-  name: "NavaliaDev",
+const TingleDevPersonality: Personality = {
+  name: "TingleDev",
   userWhitelist: [USER_PANTHEON],
   guildWhitelist: [GUILD_ENDER_CHEST],
-  tools: [webSearch],
+  commands: [webSearch],
 };
 
-const NavaliaGenericPersonality: Personality = {
-  name: "Navalia",
+const TingleGenericPersonality: Personality = {
+  name: "Tingle",
   userWhitelist: null,
   guildWhitelist: null,
-  tools: [webSearch],
+  commands: [webSearch],
 };
 
-export const Personalities = [NavaliaDevPersonality, NavaliaGenericPersonality];
+export const Personalities = [TingleDevPersonality, TingleGenericPersonality];

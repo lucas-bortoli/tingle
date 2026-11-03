@@ -1,12 +1,12 @@
-import { Client, type Message } from "discord.js";
+import { ActivityType, Client, type Message } from "discord.js";
 import type OpenAI from "openai";
 import * as z from "zod";
+import { CommandExecutionError, type Command } from "./commands/_command.ts";
 import type { Config } from "./config.ts";
 import ApplicationError from "./lib/application-error.ts";
 import Deferred from "./lib/deferred.ts";
 import createLogger from "./lib/logger.ts";
 import { Personalities, type Personality } from "./personality.ts";
-import { ToolExecutionError, type Tool } from "./tools/_tool.ts";
 
 const logger = createLogger("Awsta");
 
@@ -41,22 +41,22 @@ export default class Awsta {
   private async upsertReply(_message: Message) {}
 
   /**
-   * Executes a tool with arguments already parsed from its schema.
+   * Executes a command with arguments already parsed from its schema.
    */
-  private async invokeTool<A extends z.ZodType>(
+  private async executeCommand<A extends z.ZodType>(
     message: Message,
     personality: Personality,
-    tool: Tool<A>,
+    command: Command<A>,
     args: z.output<A>,
   ) {
-    logger.debug("Invoking tool", { name: tool.name, args: args });
+    logger.debug("Executing command", { name: command.name, args: args });
     try {
-      const result = await tool.execute(args);
+      const result = await command.execute(args, message, personality);
       return result;
     } catch (cause) {
-      throw new ToolExecutionError(
-        tool.name,
-        { toolName: tool.name, messageId: message.id, personality: personality.name },
+      throw new CommandExecutionError(
+        command.name,
+        { commandName: command.name, messageId: message.id, personality: personality.name },
         { cause },
       );
     }
@@ -72,18 +72,20 @@ export default class Awsta {
     });
 
     const argList = message.content.split(" ").filter((s) => s.trim().length);
-    const toolName = argList.shift()!.slice(this.config.prefix.length).toLowerCase();
-    const tool = personality.tools.find((t) => t.name === toolName || t.aliases.includes(toolName));
+    const commandName = argList.shift()!.slice(this.config.prefix.length).toLowerCase();
+    const command = personality.commands.find(
+      (t) => t.name === commandName || t.aliases.includes(commandName),
+    );
 
-    if (!tool) return message.react("❓");
+    if (!command) return message.react("❓");
 
-    const args = tool.parsePositionalArgs(argList);
+    const args = command.parsePositionalArgs(argList);
 
-    return this.invokeTool(message, personality, tool, args);
+    return this.executeCommand(message, personality, command, args);
   }
 
   /**
-   * Uses the model to route a natural-language message to a tool or reply.
+   * Uses the model to route a natural-language message to a command or reply.
    */
   private async handleNaturalLanguageCommandDispatch(message: Message, personality: Personality) {
     logger.debug("handleNaturalLanguageCommandDispatch", {
@@ -91,12 +93,12 @@ export default class Awsta {
       content: message.content,
     });
 
-    const commandTools = personality.tools.map((tool) => {
+    const commandTools = personality.commands.map((command) => {
       return {
         type: "function",
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.argsSchema.toJSONSchema(),
+        name: `command_${command.name}`,
+        description: `Chatbot command: ${command.description}`,
+        parameters: command.argsSchema.toJSONSchema(),
         strict: true,
       } satisfies OpenAI.Responses.Tool;
     });
@@ -115,7 +117,7 @@ export default class Awsta {
 
     const removeWaitReaction = this.addReaction(message, "🧠");
 
-    let calledTool: OpenAI.Responses.ResponseFunctionToolCall | null = null;
+    let calledFunction: OpenAI.Responses.ResponseFunctionToolCall | null = null;
 
     try {
       const responseStream = await this.openai.responses.create({
@@ -137,7 +139,7 @@ export default class Awsta {
           if (chunk.item.type === "function_call") {
             // we got the response
             responseStream.controller.abort();
-            calledTool = chunk.item;
+            calledFunction = chunk.item;
             break;
           }
         }
@@ -152,27 +154,39 @@ export default class Awsta {
       await removeWaitReaction();
     }
 
-    if (calledTool === null) {
+    if (calledFunction === null) {
       message.reply("Desculpe, não consegui interpretar sua mensagem.");
-    } else if (calledTool?.name === "reply") {
+    } else if (calledFunction.name === "reply") {
       // TODO use Zod here instead of naive JSON parse
-      const argsObject = JSON.parse(calledTool.arguments);
+      const argsObject = JSON.parse(calledFunction.arguments);
       message.reply(argsObject.content);
-    } else {
+    } else if (calledFunction.name.startsWith("command_")) {
+      const calledCommandName = calledFunction.name.replace("command_", "");
+
       // TODO use Zod here instead of naive JSON parse
-      const argsObject = JSON.parse(calledTool.arguments);
-      const tool = personality.tools.find((tool) => tool.name === calledTool.name)!;
-      const args = tool.argsSchema.parse(argsObject);
+      const argsObject = JSON.parse(calledFunction.arguments);
+      const command = personality.commands.find((command) => command.name === calledCommandName)!;
+      const args = command.argsSchema.parse(argsObject);
 
       // dispatch command
-      this.invokeTool(message, personality, tool, args);
+      this.executeCommand(message, personality, command, args);
     }
   }
 
   /**
    * Runs initialization that depends on the Discord client being ready.
    */
-  private async handlePostCreation() {}
+  private async handlePostCreation() {
+    this.client.user?.setPresence({
+      status: "online",
+      activities: [
+        {
+          name: ".ajuda ou @mencione",
+          type: ActivityType.Custom,
+        },
+      ],
+    });
+  }
 
   /**
    * Processes a newly created message for the applicable personality.
@@ -247,7 +261,7 @@ export default class Awsta {
     const deferred = new Deferred<Awsta, Error>();
     const instance = new Awsta();
     const client = new Client({
-      intents: ["Guilds", "GuildMessages", "MessageContent"],
+      intents: ["Guilds", "GuildMessages", "GuildMessageReactions", "MessageContent"],
     });
 
     client.once("clientReady", () => {
