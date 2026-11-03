@@ -8,12 +8,22 @@ export class MissingConfigurationError extends ApplicationError {
   }
 }
 
+export class TypeConfigurationError extends ApplicationError {
+  public constructor(value: string, expectedType: string) {
+    super(`Invalid integer configuration value: ${value}`, { value, expectedType });
+  }
+}
+
 export interface Config {
   discordToken: string;
   prefix: string;
   adminIds: string[];
   openaiCredentialsFile: string;
   openaiModel: string;
+  statusServer: {
+    hostname: string;
+    port: number;
+  };
 }
 
 function split(predicate?: string) {
@@ -21,6 +31,15 @@ function split(predicate?: string) {
     .split(",")
     .map((userId) => userId.trim())
     .filter(Boolean);
+}
+
+function integer(predicate?: string, fallback?: number) {
+  const value = Number.parseInt(predicate ?? "", 10);
+  if (Number.isNaN(value)) {
+    if (fallback !== undefined) return fallback;
+    throw new TypeConfigurationError(predicate ?? "", "integer");
+  }
+  return value;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv) {
@@ -40,11 +59,18 @@ export function loadConfig(env: NodeJS.ProcessEnv) {
   const openaiCredentialsFile =
     env.AWSTA_OPENAI_CREDS_FILE ?? join(tmpdir(), "awsta", "chatgpt.json");
 
+  const statusServerHostname = env.STATUS_SERVER_HOSTNAME ?? "0.0.0.0";
+  const statusServerPort = integer(env.STATUS_SERVER_PORT, 3000);
+
   return {
     discordToken,
     prefix,
     adminIds,
     openaiCredentialsFile,
     openaiModel,
+    statusServer: {
+      hostname: statusServerHostname,
+      port: statusServerPort,
+    },
   } satisfies Config;
 }

@@ -7,6 +7,7 @@ import ApplicationError from "./lib/application-error.ts";
 import Deferred from "./lib/deferred.ts";
 import createLogger from "./lib/logger.ts";
 import { Personalities, type Personality } from "./personality.ts";
+import { setHealthCheckFunction } from "./status-server.ts";
 
 const logger = createLogger("Awsta");
 
@@ -283,6 +284,14 @@ export default class Awsta {
     instance.config = config;
     instance.client = client;
     instance.openai = openai;
+
+    setHealthCheckFunction((response) => {
+      if (client.isReady()) {
+        response.writeHead(200).end("OK");
+      } else {
+        response.writeHead(503).end("Not ready");
+      }
+    });
 
     client.login(config.discordToken).catch((cause: unknown) => {
       const error = cause instanceof Error ? cause : new Error(String(cause));

@@ -3,9 +3,12 @@ import Awsta from "./awsta.ts";
 import { loadConfig } from "./config.ts";
 import createLogger from "./lib/logger.ts";
 import * as openaiAuth from "./lib/openai-auth.ts";
+import initializeServer from "./status-server.ts";
 
 const logger = createLogger("Index");
 const config = loadConfig(process.env);
+
+await initializeServer(config.statusServer.port, config.statusServer.hostname);
 
 openaiAuth.setCredentialsPath(config.openaiCredentialsFile);
 await openaiAuth.initializeAuthInteractive();
