@@ -10,8 +10,7 @@ let healthCheckFunction: HandlerFunction | null = null;
 const logger = createLogger("StatusServer");
 
 const server = http.createServer((request, response) => {
-  const url = new URL(request.url!);
-  const endpoint = `${request.method!.toUpperCase()} ${url.pathname}`;
+  const endpoint = `${request.method!.toUpperCase()} ${request.url?.split("?", 1)[0] ?? "/"}`;
 
   logger.debug("Request", { endpoint });
 
