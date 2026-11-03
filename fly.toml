@@ -1,23 +1,16 @@
-# fly.toml app configuration file generated for tingle on 2026-11-03T16:50:53Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
 app = 'tingle'
 primary_region = 'ewr'
 
 [build]
 
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
+[env]
+  AWSTA_OPENAI_CREDS_FILE = '/data/chatgpt.json'
+
+[mounts]
+  source = 'tingle_data'
+  destination = '/data'
 
 [[vm]]
-  memory = '1gb'
+  memory = '256mb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 256
